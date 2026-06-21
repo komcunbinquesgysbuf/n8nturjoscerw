@@ -1,47 +1,65 @@
-version: 1
+# Use this Blueprint to deploy n8n on Render as a web
+# service that uses a Postgres database to store
+# workflow data.
+#
+# This Blueprint uses free instance types (specified by
+# `plan`) for both the web service and the database. You
+# can upgrade to paid instance types at any time to
+# increase resources.
+
 services:
   - type: web
-    name: traefik
-    runtime: docker
-    plan: starter
-    image: traefik
-    autoDeploy: true
-    dockerCommand:
-      - "--api.insecure=true"
-      - "--providers.docker=false"
-      - "--providers.file.directory=/etc/traefik"
-      - "--providers.file.watch=true"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
-      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
-      - "--entrypoints.websecure.address=:443"
-      - "--certificatesresolvers.mytlschallenge.acme.tlschallenge=true"
-      - "--certificatesresolvers.mytlschallenge.acme.email=${SSL_EMAIL}"
-      - "--certificatesresolvers.mytlschallenge.acme.storage=/letsencrypt/acme.json"
-    envVars:
-      - key: SSL_EMAIL
-        value: "REPLACE_ME"
+    plan: free
+    # This is the runtime for services that pull a prebuilt Docker image
+    runtime: image
+    # You can give the service any name
+    name: n8n-service
+    image:
+      # Pulls the n8n image tagged as latest from Docker Hub
+      url: docker.io/n8nio/n8n:latest
 
-  - type: web
-    name: n8n
-    runtime: docker
-    plan: starter
-    image: docker.n8n.io/n8nio/n8n
-    autoDeploy: true
+    # All environment variables defined below are required!
+    #
+    # You can define additional environment variables as needed.
     envVars:
-      - key: N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS
-        value: "true"
-      - key: N8N_HOST
-        value: "${SUBDOMAIN}.${DOMAIN_NAME}"
-      - key: N8N_PORT
-        value: "5678"
-      - key: N8N_PROTOCOL
-        value: "https"
-      - key: NODE_ENV
-        value: "production"
-      - key: WEBHOOK_URL
-        value: "https://${SUBDOMAIN}.${DOMAIN_NAME}/"
-      - key: GENERIC_TIMEZONE
-        value: "${GENERIC_TIMEZONE}"
-      - key: TZ
-        value: "${GENERIC_TIMEZONE}"
+      # Generates a base64-encoded key for
+      # encrypting credentials in n8n
+      #
+      # Do not modify this value after it's generated!
+      # If you do, you'll lose access to all credentials
+      # encrypted with the previous value.
+      - key: N8N_ENCRYPTION_KEY
+        generateValue: true
+
+      # These automatically populate connection details 
+      # for the Render Postgres database defined below
+      - key: DB_TYPE
+        value: postgresdb
+      - key: DB_POSTGRESDB_DATABASE
+        fromDatabase:
+          name: n8n-db
+          property: database
+      - key: DB_POSTGRESDB_HOST
+        fromDatabase:
+          name: n8n-db
+          property: host
+      - key: DB_POSTGRESDB_PASSWORD
+        fromDatabase:
+          name: n8n-db
+          property: password
+      - key: DB_POSTGRESDB_USER
+        fromDatabase:
+          name: n8n-db
+          property: user
+
+databases:
+  - name: n8n-db
+    plan: free
+    # The free instance type is limited to 1 GB of disk
+    # space.
+    #
+    # If you later upgrade to a paid instance type, you can
+    # increase the disk size to any multiple of 5 GB by
+    # setting the `diskSizeGB` property.
+    #
+    # diskSizeGB: 5
