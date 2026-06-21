@@ -16,7 +16,6 @@ services:
       - key: GENERIC_TIMEZONE
         value: "REPLACE_ME"
     # Traefik container
-    dockerCommand: []
     dockerImage: traefik
     # Expose 80/443 from Traefik
     ports:
