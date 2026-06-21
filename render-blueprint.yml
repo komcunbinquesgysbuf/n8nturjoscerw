@@ -15,11 +15,6 @@ services:
         value: "REPLACE_ME"
       - key: GENERIC_TIMEZONE
         value: "REPLACE_ME"
-    ports:
-      - port: 80
-        protocol: http
-      - port: 443
-        protocol: https
     autoDeploy: true
     volumes:
       - name: traefik_data
@@ -44,6 +39,8 @@ services:
     runtime: docker
     plan: starter
     image: docker.n8n.io/n8nio/n8n
+    healthCheckPath: /
+    autoDeploy: true
     envVars:
       - key: N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS
         value: "true"
@@ -66,9 +63,6 @@ services:
         mountPath: /home/node/.n8n
       - name: n8n_files
         mountPath: /files
-    healthCheckPath: /
-    port: 5678
-    autoDeploy: true
 
 volumes:
   - name: traefik_data
