@@ -1,0 +1,94 @@
+version: 1
+services:
+  - type: web
+    name: traefik
+    runtime: docker
+    plan: starter
+    dockerfilePath: .
+    healthCheckPath: /api/overview
+    envVars:
+      - key: SSL_EMAIL
+        value: "REPLACE_ME"
+      - key: DOMAIN_NAME
+        value: "REPLACE_ME"
+      - key: SUBDOMAIN
+        value: "REPLACE_ME"
+      - key: GENERIC_TIMEZONE
+        value: "REPLACE_ME"
+    # Traefik container
+    dockerCommand: []
+    dockerImage: traefik
+    # Expose 80/443 from Traefik
+    ports:
+      - port: 80
+        protocol: http
+      - port: 443
+        protocol: https
+    autoDeploy: true
+    # Persist ACME certs + provide Traefik config file
+    volumes:
+      - name: traefik_data
+        mountPath: /letsencrypt
+      - name: traefik_config
+        mountPath: /etc/traefik
+    # Traefik command (translated from compose)
+    dockerCommand:
+      - "--api.insecure=true"
+      - "--providers.docker=false"
+      - "--providers.file.directory=/etc/traefik"
+      - "--providers.file.watch=true"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.mytlschallenge.acme.tlschallenge=true"
+      - "--certificatesresolvers.mytlschallenge.acme.email=${SSL_EMAIL}"
+      - "--certificatesresolvers.mytlschallenge.acme.storage=/letsencrypt/acme.json"
+    # NOTE: Render doesn't mount /var/run/docker.sock; removed.
+
+  - type: web
+    name: n8n
+    runtime: docker
+    plan: starter
+    dockerImage: docker.n8n.io/n8nio/n8n
+    envVars:
+      - key: N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS
+        value: "true"
+      - key: N8N_HOST
+        value: "${SUBDOMAIN}.${DOMAIN_NAME}"
+      - key: N8N_PORT
+        value: "5678"
+      - key: N8N_PROTOCOL
+        value: "https"
+      - key: NODE_ENV
+        value: "production"
+      - key: WEBHOOK_URL
+        value: "https://${SUBDOMAIN}.${DOMAIN_NAME}/"
+      - key: GENERIC_TIMEZONE
+        value: "${GENERIC_TIMEZONE}"
+      - key: TZ
+        value: "${GENERIC_TIMEZONE}"
+    volumes:
+      - name: n8n_data
+        mountPath: /home/node/.n8n
+      - name: n8n_files
+        mountPath: /files
+    # Render internal port (no need to expose publicly; Traefik will route)
+    healthCheckPath: /
+    # Render uses container port; keep 5678
+    # (If Render Blueprint requires explicit port declarations for container,
+    # ensure container listens on 5678.)
+    port: 5678
+    autoDeploy: true
+
+# Render volumes
+databases: []
+volumes:
+  - name: traefik_data
+    mountPath: /letsencrypt
+  - name: n8n_data
+    mountPath: /home/node/.n8n
+  - name: n8n_files
+    mountPath: /files
+  - name: traefik_config
+    mountPath: /etc/traefik
